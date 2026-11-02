@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-anime}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-anime}
+      POSTGRES_DB: ${POSTGRES_DB:-animehub}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Внутри сети Docker приложение ходит в БД по имени сервиса db
+      DATABASE_URL: postgresql://${POSTGRES_USER:-anime}:${POSTGRES_PASSWORD:-anime}@db:5432/${POSTGRES_DB:-animehub}?schema=public
+      NODE_ENV: production
+    # Для прямого доступа без nginx (тесты): "3000:3000"
+    # С nginx+certbot на хосте: "127.0.0.1:3000:3000"
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
